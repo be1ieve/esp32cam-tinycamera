@@ -22,17 +22,24 @@
  *  13                     SCL
  *  12                                       INT    (BOOT LOW)
 
- * Settings used in TFT_eSPI/User_Setup.h:
- *    #define ST7735_DRIVER
- *    #define TFT_RGB_ORDER TFT_RGB  // Colour order Red-Green-Blue
- *    #define TFT_WIDTH  128
- *    #define TFT_HEIGHT 160
- *    #define ST7735_GREENTAB
+ * Settings in TFT_eSPI/User_Setup.h:
+ 
+ * Pin definition for SPI displays to ESP32-CAM:
  *    #define TFT_MOSI  3
  *    #define TFT_SCLK 13
  *    #define TFT_CS    1
  *    #define TFT_DC    4
  *    #define TFT_RST  -1
+
+ * For 1.8 inch ST7735 screen:
+ *    #define ST7735_DRIVER
+ *    #define TFT_RGB_ORDER TFT_RGB  // Colour order Red-Green-Blue
+ *    #define TFT_WIDTH  128
+ *    #define TFT_HEIGHT 160
+ *    #define ST7735_GREENTAB
+ * For 3.5 inch RPi-TFT screen:
+ *    #define RPI_ILI9486_DRIVER // 20MHz maximum SPI
+
 */
 
 // Copy configs from official example. This is for AI-thinker esp32-cam
@@ -56,6 +63,7 @@
 TFT_eSPI tft = TFT_eSPI();         // Invoke custom library
 
 int BUTTON = 12; // BUTTON on GPIO 12
+int RED_LED = 33; // onboard led on GPIO 33
 boolean buttonPressed = false;
 
 boolean hasSD = false;
@@ -151,7 +159,7 @@ void init_camera_lowres(){
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
 
-  config.frame_size = FRAMESIZE_QVGA; // 320*240
+  config.frame_size = FRAMESIZE_HVGA;
   config.grab_mode = CAMERA_GRAB_LATEST;
   config.fb_location = CAMERA_FB_IN_DRAM;
   config.jpeg_quality = 10; //< Quality of JPEG output. 0-63 lower means higher quality
@@ -166,12 +174,13 @@ void init_tft(){
   tft.begin();
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.fillScreen(TFT_BLACK);
-  tft.setRotation(1);//1:landscape 3:inv. landscape
+  tft.setRotation(3);//1:landscape 3:inv. landscape
   tft.setSwapBytes(true); // Swap byte order if display weird color
 
   // The jpeg image can be scaled down by a factor of 1, 2, 4, or 8
   // FRAMESIZE_QQVGA(160*120), FRAMESIZE_QVGA(320*240), FRAMESIZE_VGA(640*480), and FRAMESIZE_SXGA(1280*1024)
-  TJpgDec.setJpgScale(2); // QVGA with 160x128 screen
+  // FRAMESIZE_HVGA(480*320)
+  //TJpgDec.setJpgScale(2); // QVGA with 160x128 screen
   // The decoder must be given the exact name of the rendering function above
   TJpgDec.setCallback(tft_output);
 }
@@ -199,6 +208,9 @@ void setup() {
   pinMode(BUTTON, INPUT_PULLDOWN); // GPIO 12 needs to be low on boot
   attachInterrupt(BUTTON, buttonHandler, FALLING); // this means just release the button
 
+  pinMode(RED_LED, OUTPUT);
+  digitalWrite(RED_LED, HIGH);
+
   init_camera_lowres(); // default to low-res
 
 }
@@ -217,7 +229,9 @@ void loop() {
         esp_camera_fb_return(fb);
         delay(10);
       }
+      digitalWrite(RED_LED, LOW);
       fb = esp_camera_fb_get();
+      digitalWrite(RED_LED, HIGH);
       char filename[15];
       sprintf(filename, "/img%05d.jpg", ++fileCount);
       writeFile(SD_MMC, filename, fb->buf, fb->len);
