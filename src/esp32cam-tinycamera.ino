@@ -131,6 +131,10 @@ void init_camera_highres(){
   config.fb_count = 2; //Number of frame buffers to be allocated. If more than one, then each frame will be acquired (double speed)
 
   esp_err_t err = esp_camera_init(&config);
+
+  sensor_t * s = esp_camera_sensor_get();
+  s->set_vflip(s, 1);
+  s->set_hmirror(s, 1);
 }
 
 // Low resolution config for TFT view
@@ -159,13 +163,17 @@ void init_camera_lowres(){
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
 
-  config.frame_size = FRAMESIZE_HVGA;
+  config.frame_size = FRAMESIZE_QVGA;
   config.grab_mode = CAMERA_GRAB_LATEST;
   config.fb_location = CAMERA_FB_IN_DRAM;
   config.jpeg_quality = 10; //< Quality of JPEG output. 0-63 lower means higher quality
   config.fb_count = 2; //Number of frame buffers to be allocated. If more than one, then each frame will be acquired (double speed)
 
   esp_err_t err = esp_camera_init(&config);
+
+  sensor_t * s = esp_camera_sensor_get();
+  s->set_vflip(s, 1);
+  s->set_hmirror(s, 1);
 }
 
 void init_tft(){
@@ -174,13 +182,13 @@ void init_tft(){
   tft.begin();
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.fillScreen(TFT_BLACK);
-  tft.setRotation(3);//1:landscape 3:inv. landscape
+  tft.setRotation(1);//1:landscape 3:inv. landscape
   tft.setSwapBytes(true); // Swap byte order if display weird color
 
   // The jpeg image can be scaled down by a factor of 1, 2, 4, or 8
   // FRAMESIZE_QQVGA(160*120), FRAMESIZE_QVGA(320*240), FRAMESIZE_VGA(640*480), and FRAMESIZE_SXGA(1280*1024)
   // FRAMESIZE_HVGA(480*320)
-  //TJpgDec.setJpgScale(2); // QVGA with 160x128 screen
+  TJpgDec.setJpgScale(2); // QVGA with 160x128 screen
   // The decoder must be given the exact name of the rendering function above
   TJpgDec.setCallback(tft_output);
 }
@@ -223,15 +231,15 @@ void loop() {
     if (hasSD){
       init_camera_highres(); // capture at high-res
       camera_fb_t *fb = NULL;
+      digitalWrite(RED_LED, LOW); // ON
       for(int i=0;i<10;i++) { // Drop first few frames for image quality to stablize
         fb = esp_camera_fb_get();
         delay(10);
         esp_camera_fb_return(fb);
         delay(10);
       }
-      digitalWrite(RED_LED, LOW);
       fb = esp_camera_fb_get();
-      digitalWrite(RED_LED, HIGH);
+      digitalWrite(RED_LED, HIGH); // OFF
       char filename[15];
       sprintf(filename, "/img%05d.jpg", ++fileCount);
       writeFile(SD_MMC, filename, fb->buf, fb->len);
@@ -245,11 +253,11 @@ void loop() {
     fb = esp_camera_fb_get();
     if (!fb) {
       esp_camera_fb_return(fb);
-      delay(500);
+      delay(100);
       return;
     }
     if (fb->format != PIXFORMAT_JPEG) {
-      delay(500);
+      delay(100);
       return;
     }
     TJpgDec.drawJpg(0, 0,  fb->buf, fb->len);
